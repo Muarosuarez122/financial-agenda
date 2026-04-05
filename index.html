@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProManager - Agenda y Finanzas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Auth View -->
+    <div id="authView" class="auth-wrapper">
+        <div class="auth-card">
+            <div class="logo-container auth-logo">
+                <div class="logo-icon">PM</div>
+                <h1>ProManager</h1>
+            </div>
+            <h2>Acceso Unificado</h2>
+            <p>Usa tu cuenta de Supabase para ProContract y ProManager.</p>
+            <div class="input-group">
+                <input type="email" id="authEmail" placeholder="Tu correo electrónico" required>
+            </div>
+            <div class="input-group">
+                <input type="password" id="authPassword" placeholder="Tu contraseña" required>
+            </div>
+            <button id="loginBtn" class="primary-btn">Entrar / Registrarse</button>
+            <p id="authError" style="color: #ef4444; font-size: 13px; margin-top: 10px; display: none;"></p>
+            
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container" id="appView" style="display: none;">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">PM</div>
+                <h1>ProManager</h1>
+            </div>
+
+            <div class="user-account-panel">
+                <div class="user-info">
+                    <div class="avatar" id="userAvatar">U</div>
+                    <div class="user-details">
+                        <span id="userEmailDisplay" class="user-email">usuario@correo.com</span>
+                        <span id="userPlanDisplay" class="user-plan badge-free">PLAN GRATUITO</span>
+                    </div>
+                </div>
+                <button id="logoutBtn" class="text-btn">Salir</button>
+            </div>
+
+            <!-- Navigation -->
+            <div class="nav-menu">
+                <button class="nav-item active" data-target="agendaSection">📅 Agenda y Tareas</button>
+                <button class="nav-item" data-target="financeSection">💰 Análisis Financiero</button>
+            </div>
+
+            <!-- Premium Banner -->
+            <div class="premium-banner" id="premiumBanner">
+                <div class="banner-content">
+                    <span class="badge">PRO</span>
+                    <h3>Mejora tu Productividad</h3>
+                    <p>Tareas ilimitadas, gráficos financieros y reportes exportables.</p>
+                </div>
+                <button id="upgradeBtn" class="upgrade-btn">Descubrir Planes</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            
+            <!-- Agenda Section -->
+            <section id="agendaSection" class="dashboard-section active">
+                <div class="section-header">
+                    <h2>Agenda de Tareas</h2>
+                    <div class="tier-indicator" id="taskTierIndicator">Tareas: 0/5 (Gratis)</div>
+                </div>
+                
+                <div class="task-input-area">
+                    <input type="text" id="newTaskInput" placeholder="Añadir una nueva tarea o evento...">
+                    <button id="addTaskBtn" class="primary-btn add-btn">+</button>
+                </div>
+
+                <div class="task-list" id="taskList">
+                    <!-- Tasks injected via JS -->
+                </div>
+            </section>
+
+            <!-- Finance Section -->
+            <section id="financeSection" class="dashboard-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Control Financiero</h2>
+                    <span class="pro-lock" id="financeProLock" style="display: inline-block;">FUNCIONES PRO LIMITADAS</span>
+                </div>
+
+                <div class="finance-cards">
+                    <div class="stat-card income">
+                        <h4>Ingresos</h4>
+                        <h2 id="totalIncome">$0.00</h2>
+                    </div>
+                    <div class="stat-card expense">
+                        <h4>Gastos</h4>
+                        <h2 id="totalExpense">$0.00</h2>
+                    </div>
+                    <div class="stat-card balance">
+                        <h4>Balance</h4>
+                        <h2 id="totalBalance">$0.00</h2>
+                    </div>
+                </div>
+
+                <div class="finance-form">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Tipo</label>
+                            <select id="finType">
+                                <option value="income">Ingreso</option>
+                                <option value="expense">Gasto</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Descripción</label>
+                            <input type="text" id="finDesc" placeholder="Ej. Pago cliente">
+                        </div>
+                        <div class="input-group">
+                            <label>Monto</label>
+                            <input type="number" id="finAmount" placeholder="100.00">
+                        </div>
+                        <button id="addFinBtn" class="primary-btn" style="margin-top: 24px;">Registrar</button>
+                    </div>
+                </div>
+
+                <div class="finance-chart-container premium-section" id="chartSection">
+                    <div class="chart-overlay lock-overlay" id="chartLockOverlay">
+                        <h3>Gráficos Analíticos Desactivados</h3>
+                        <p>Actualiza a PRO para analizar tus finanzas visualmente e identificar tendencias de gasto.</p>
+                        <button class="upgrade-btn-small" onclick="document.getElementById('upgradeBtn').click()">Desbloquear Ahora</button>
+                    </div>
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal Checkout Premium / Bundle -->
+    <div class="modal-overlay" id="checkoutModal">
+        <div class="modal">
+            <button class="close-modal" id="closeModal">&times;</button>
+            <div class="modal-header">
+                <h2>Mejora tu Productividad</h2>
+                <p style="color: #94a3b8; font-size: 14px; margin-top: 8px;">Accede a todas las herramientas sin límites. Pago único de por vida.</p>
+            </div>
+            <div class="modal-body">
+                <div class="pricing-cards">
+                    <!-- Option 1: Only Manager -->
+                    <div class="pricing-card" data-plan="manager" data-price="2.00">
+                        <h3>ProManager Solo</h3>
+                        <div class="price">$2.00 <span>USD</span></div>
+                        <ul>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> Tareas Ilimitadas</li>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> Gráficos Financieros</li>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> Reportes y Soporte</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Option 2: The Bundle -->
+                    <div class="pricing-card bundle selected" data-plan="bundle" data-price="4.00">
+                        <div class="badge-bundle">MEJOR VALOR</div>
+                        <h3>Ecosistema Completo</h3>
+                        <div class="price">$4.00 <span>USD</span></div>
+                        <ul>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> App: ProManager (Finanzas)</li>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> App: ProContract (Contratos)</li>
+                            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg> Ahorro del 50% ($2 USD)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="payment-placeholder" id="paypal-button-container">
+                    <!-- PayPal buttons -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SDK de PayPal -->
+    <script
+        src="https://www.paypal.com/sdk/js?client-id=AXhOXSEflhJ0l-Lba-11JOikxaexjcG1_CQjK4jYHGVpB_FDULWW-AX3gFLFDREUwMuqISU0Wz4CQqEA&buyer-country=US&currency=USD&components=buttons&enable-funding=venmo,card&disable-funding=paylater"
+        data-sdk-integration-source="developer-studio"
+    ></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
