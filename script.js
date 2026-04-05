@@ -1,9 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyArg2GNhsnlK7-JW0w-8D4tb46V2vAgZbQ",
   authDomain: "stee-53dc1.firebaseapp.com",
+  databaseURL: "https://stee-53dc1-default-rtdb.firebaseio.com",
   projectId: "stee-53dc1",
   storageBucket: "stee-53dc1.firebasestorage.app",
   messagingSenderId: "737719774829",
@@ -13,21 +15,23 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 
-let globalUsersDb = JSON.parse(localStorage.getItem('global_supabase_mock')) || {};
 let currentUser = null;
 let currentFbUser = null;
 
-function saveGlobalDB() {
-    if(currentFbUser) {
-        globalUsersDb[currentFbUser.uid] = currentUser;
-        localStorage.setItem('global_supabase_mock', JSON.stringify(globalUsersDb));
+async function saveGlobalDB() { // For Finance agenda
+    if (currentFbUser && currentUser) {
+        try {
+            await set(ref(db, 'users/' + currentFbUser.uid), currentUser);
+        } catch (e) {
+            console.error("Error saving to Realtime Database:", e);
+        }
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Auth DOM
     const authView = document.getElementById('authView');
     const appView = document.getElementById('appView');
     const loginBtn = document.getElementById('loginBtn');
@@ -67,31 +71,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentFbUser = user;
-            if (!globalUsersDb[user.uid]) {
-                const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
-                globalUsersDb[user.uid] = {
-                    email: user.email,
-                    isContractPro: isAdmin,
-                    isManagerPro: isAdmin,
-                    isBundle: isAdmin,
-                    agendaTasks: [],
-                    financeRecords: []
-                };
-                saveGlobalDB();
-            } else {
-                const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
-                if(isAdmin && !globalUsersDb[user.uid].isManagerPro) {
-                    globalUsersDb[user.uid].isContractPro = true;
-                    globalUsersDb[user.uid].isManagerPro = true;
-                    globalUsersDb[user.uid].isBundle = true;
+            try {
+                const snapshot = await get(child(ref(db), `users/${user.uid}`));
+                if (snapshot.exists()) {
+                    currentUser = snapshot.val();
+                    const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
+                    if (isAdmin && !currentUser.isManagerPro) {
+                         currentUser.isContractPro = true;
+                         currentUser.isManagerPro = true;
+                         currentUser.isBundle = true;
+                         saveGlobalDB();
+                    }
+                } else {
+                    const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
+                    currentUser = {
+                        email: user.email,
+                        isContractPro: isAdmin,
+                        isManagerPro: isAdmin,
+                        isBundle: isAdmin,
+                        agendaTasks: [],
+                        financeRecords: []
+                    };
                     saveGlobalDB();
                 }
+                showApp();
+            } catch(e) {
+                authError.textContent = 'Error base de datos: ' + e.message;
+                authError.style.display = 'block';
+                loginBtn.textContent = 'Entrar / Registrarse';
             }
-            currentUser = globalUsersDb[user.uid];
-            showApp();
         } else {
             currentUser = null;
             currentFbUser = null;
@@ -106,6 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
         appView.style.display = 'flex';
         document.getElementById('userEmailDisplay').textContent = currentUser.email;
         document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
+
+        if (!currentUser.agendaTasks) currentUser.agendaTasks = [];
+        if (!currentUser.financeRecords) currentUser.financeRecords = [];
 
         applyPlanFeatures();
         renderTasks();
