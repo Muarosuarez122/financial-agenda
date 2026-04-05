@@ -20,13 +20,26 @@ const db = getDatabase(app);
 let currentUser = null;
 let currentFbUser = null;
 
-async function saveGlobalDB() { // For Finance agenda
+async function savePremiumToFirebase() {
     if (currentFbUser && currentUser) {
         try {
-            await set(ref(db, 'users/' + currentFbUser.uid), currentUser);
+            await set(ref(db, 'users/' + currentFbUser.uid), {
+                isContractPro: currentUser.isContractPro,
+                isManagerPro: currentUser.isManagerPro,
+                isBundle: currentUser.isBundle
+            });
         } catch (e) {
-            console.error("Error saving to Realtime Database:", e);
+            console.error("Error saving Premium to Realtime Database:", e);
         }
+    }
+}
+
+function saveLocalData() {
+    if (currentFbUser && currentUser) {
+        localStorage.setItem(`financeData_${currentFbUser.uid}`, JSON.stringify({
+            agendaTasks: currentUser.agendaTasks || [],
+            financeRecords: currentUser.financeRecords || []
+        }));
     }
 }
 
@@ -77,43 +90,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     logoutBtn.addEventListener('click', () => {
-        signOut(auth).then(() => {
-            location.reload();
-        });
+        signOut(auth).then(() => location.reload());
     });
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentFbUser = user;
+            
+            let localData = JSON.parse(localStorage.getItem(`financeData_${user.uid}`)) || { agendaTasks: [], financeRecords: [] };
+
+            currentUser = {
+                email: user.email,
+                isContractPro: false,
+                isManagerPro: false,
+                isBundle: false,
+                agendaTasks: localData.agendaTasks || [],
+                financeRecords: localData.financeRecords || []
+            };
+
+            const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
+
             try {
                 const snapshot = await get(child(ref(db), `users/${user.uid}`));
                 if (snapshot.exists()) {
-                    currentUser = snapshot.val();
-                    const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
-                    if (isAdmin && !currentUser.isManagerPro) {
-                         currentUser.isContractPro = true;
-                         currentUser.isManagerPro = true;
-                         currentUser.isBundle = true;
-                         saveGlobalDB();
-                    }
-                } else {
-                    const isAdmin = user.email.toLowerCase() === 'admin' || user.email.toLowerCase() === 'admin@admin.com';
-                    currentUser = {
-                        email: user.email,
-                        isContractPro: isAdmin,
-                        isManagerPro: isAdmin,
-                        isBundle: isAdmin,
-                        agendaTasks: [],
-                        financeRecords: []
-                    };
-                    saveGlobalDB();
+                    const dbData = snapshot.val();
+                    currentUser.isContractPro = dbData.isContractPro || false;
+                    currentUser.isManagerPro = dbData.isManagerPro || false;
+                    currentUser.isBundle = dbData.isBundle || false;
                 }
-                showApp();
             } catch(e) {
-                authError.textContent = 'Error base de datos: ' + e.message;
-                authError.style.display = 'block';
-                loginBtn.textContent = 'Entrar / Registrarse';
+                console.warn("Realtime DB block or free user missing payload.");
             }
+
+            if (isAdmin) {
+                currentUser.isContractPro = true;
+                currentUser.isManagerPro = true;
+                currentUser.isBundle = true;
+            }
+
+            showApp();
         } else {
             currentUser = null;
             currentFbUser = null;
@@ -203,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         currentUser.agendaTasks.push({ id: Date.now(), text, completed: false });
-        saveGlobalDB();
+        saveLocalData();
         newTaskInput.value = '';
         renderTasks();
     });
@@ -232,14 +247,14 @@ document.addEventListener('DOMContentLoaded', () => {
             chk.addEventListener('change', (e) => {
                 const id = parseInt(e.target.dataset.id);
                 const t = currentUser.agendaTasks.find(x => x.id === id);
-                if(t) { t.completed = e.target.checked; saveGlobalDB(); renderTasks(); }
+                if(t) { t.completed = e.target.checked; saveLocalData(); renderTasks(); }
             });
         });
         document.querySelectorAll('.task-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const id = parseInt(e.currentTarget.dataset.id);
                 currentUser.agendaTasks = currentUser.agendaTasks.filter(x => x.id !== id);
-                saveGlobalDB(); renderTasks();
+                saveLocalData(); renderTasks();
             });
         });
     }
@@ -258,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!desc || isNaN(amount)) return;
 
         currentUser.financeRecords.push({ id: Date.now(), type, desc, amount });
-        saveGlobalDB();
+        saveLocalData();
         
         document.getElementById('finDesc').value = '';
         document.getElementById('finAmount').value = '';
@@ -341,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             },
             onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
+                return actions.order.capture().then(async function(details) {
                     checkoutModal.classList.remove('active');
                     
                     if (selectedPlan === 'bundle') {
@@ -352,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentUser.isManagerPro = true;
                     }
 
-                    saveGlobalDB();
+                    await savePremiumToFirebase();
                     applyPlanFeatures();
                     renderFinances(); 
                     alert('¡Pago exitoso! Disfruta de ProManager.');
