@@ -41,7 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.addEventListener('click', async () => {
         const email = document.getElementById('authEmail').value.trim();
         const pass = document.getElementById('authPassword').value.trim();
-        if (!email || !pass) return;
+        
+        if (!email || !pass) {
+            authError.textContent = 'Completa ambos campos.';
+            authError.style.display = 'block';
+            return;
+        }
 
         loginBtn.textContent = 'Procesando...';
         authError.style.display = 'none';
@@ -49,16 +54,22 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await signInWithEmailAndPassword(auth, email, pass);
         } catch (error) {
-            if (error.code.includes('user-not-found') || error.code.includes('invalid-credential')) {
+            if (error.code.includes('invalid-credential') || error.code.includes('user-not-found') || error.code.includes('wrong-password')) {
                 try {
                     await createUserWithEmailAndPassword(auth, email, pass);
                 } catch (err2) {
-                    authError.textContent = 'Error: ' + err2.message;
+                    if (err2.code === 'auth/email-already-in-use') {
+                        authError.textContent = 'Contraseña incorrecta. El usuario ya existe.';
+                    } else if (err2.code === 'auth/weak-password') {
+                        authError.textContent = 'La contraseña es muy débil (mínimo 6 caracteres).';
+                    } else {
+                        authError.textContent = 'Error: ' + err2.message;
+                    }
                     authError.style.display = 'block';
                     loginBtn.textContent = 'Entrar / Registrarse';
                 }
             } else {
-                authError.textContent = 'Error: ' + error.message;
+                authError.textContent = 'Error de autenticación: ' + error.message;
                 authError.style.display = 'block';
                 loginBtn.textContent = 'Entrar / Registrarse';
             }
